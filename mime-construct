@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 use strict;
 
-# $Id: mime-construct,v 1.9 2001/04/07 03:02:45 roderick Exp $
+# $Id: mime-construct,v 1.10 2005/03/30 20:58:54 roderick Exp $
 #
 # Roderick Schertler <roderick@argon.org>
 
@@ -21,7 +21,6 @@ use strict;
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 # XXX
-#    - use mime.types to default the type for files, idea from PerlJam
 #    - don't always load bodies into memory?
 #    - continue long header lines I construct
 
@@ -29,7 +28,7 @@ use Proc::WaitStat qw(close_die);
 
 (my $Me = $0) =~ s-.*/--;
 my # new line required for makemaker
-    $VERSION = '1.8';
+    $VERSION = '1.9';
 
 my $Debug	= 0;
 my $Exit	= 0;
@@ -63,10 +62,15 @@ usage: $Me switch...
 
   Part output switches:
     --file path		output a part whose contents come from path
+    --file-auto path	same, but also set the Content-Type from the
+			path's extention (requires MIME::Types)
+    --file-attach path	same, but also set --attachment to the file's base name
     --string str	output a part whose contents are str
 
   Subpart output switches:
     --subpart-file path
+    --subpart-file-auto path
+    --subpart-file-attach path
     --subpart-string str
     	Same as previous two, but path or str contains a subpart.  It can
     	contains headers, and you can't specify a --type or --encoding for
@@ -264,6 +268,28 @@ sub choose_boundary {
     xdie "can't find a reasonable boundary\n";
 }
 
+
+{ my $mts;
+sub choose_type {
+    my ($path) = @_;
+
+    $mts ||= do {
+	require MIME::Types;
+	MIME::Types->new(only_complete => 1)
+    };
+
+    my $mt = $mts->mimeTypeOf($path)
+	or return;
+    return $mt->type;
+} }
+
+sub choose_attachment_name {
+    my ($path) = @_;
+
+    require File::Basename;
+    return File::Basename::basename($path);
+}
+
 sub process {
     my @args = @_;
 
@@ -273,7 +299,7 @@ sub process {
     }
 
     my ($switch, $arg, $subject, @to, @cc, @bcc, $header, $part_header,
-	$output, $subpart, $embedded_to, $encoding, @part, $type,
+	$output, $subpart, $embedded_to, $encoding, @part, $type, $attach_name,
 	@output, $multipart, $multipart_encoding, @recip, $prelude);
 
     $output = 0;
@@ -287,7 +313,7 @@ sub process {
     $multipart_encoding = '7bit';
 
     # per-part
-    $encoding = $part_header = $type = undef;
+    $encoding = $part_header = $type = $attach_name = undef;
 
     while (@args) {
     	$switch = shift @args;
@@ -326,8 +352,7 @@ sub process {
 	    	    	"$switch\n";
 	$arg = shift @args;
 	if ($switch eq '--attachment') {
-	    $part_header .= "Content-Disposition: attachment; filename="
-    	    	    	    . token_quote($arg) . "\n";
+	    $attach_name = $arg;
 	}
 	elsif ($switch eq '--bcc') {
 	    push @bcc, $arg;
@@ -363,15 +388,25 @@ sub process {
 	    $type = $arg;
 	}
 
-	elsif ($switch eq '--file' || $switch eq '--string'
-		|| $switch eq '--subpart-file'
-		|| $switch eq '--subpart-string') {
-	    my ($is_sub, $body, $actual_encoding);
-	    $is_sub = ($switch =~ s/^--subpart-/--/);
+	elsif ($switch =~ /^--(subpart-)?(file(-auto|-attach)?|string)\z/) {
+	    my ($body, $actual_encoding);
+	    my $is_sub		= ($switch =~ s/^--subpart-/--/);
+	    my $is_attach	= $switch eq '--file-attach';
+	    my $is_auto_type	= $is_attach || $switch eq '--file-auto';
+
 	    if ($switch eq '--string') {
 		$body = $arg;
 	    }
 	    else {
+		if ($is_auto_type) {
+		    $type = choose_type($arg)
+				|| $type
+				|| 'application/octet-stream';
+		}
+		if ($is_attach) {
+		    $attach_name ||= choose_attachment_name $arg;
+    	    	}
+
 		require FileHandle;
 		# This will work with an arbitrarily weird file name,
 		# but it will also allow 'zcat file.gz|' to work.
@@ -383,6 +418,16 @@ sub process {
 		    $body = <$fh>;
 		}
 		close_die $fh, $arg;
+	    }
+
+	    my $type_extra = '';
+	    if (defined $attach_name) {
+		$part_header .= "Content-Disposition: attachment; filename="
+				. token_quote($attach_name) . "\n";
+		# This might not be strictly safe (maybe a particular
+		# type uses name to mean something else), but it's
+		# required by some mail clients.
+		$type_extra .= "; name=" . token_quote $attach_name;
 	    }
 
 	    my $p = defined $part_header ? $part_header : '';
@@ -399,12 +444,16 @@ sub process {
 		$type		= 'text/plain'	unless defined $type;
 
 		($actual_encoding, $body) = encode $encoding, $body;
+
+		$type .= $type_extra;
 		$p .= cont "Content-Type: $type\n"
 		    unless $type =~ m|^\s* text/plain
 					(?:\s* ; \s* charset=(\")?us-ascii\1)?
 					\s*$|xi;
+
 		$p .= cont "Content-Transfer-Encoding: $actual_encoding\n"
 		    unless lc($actual_encoding) eq '7bit';
+
 		$p .= "\n";
 	    }
 
@@ -419,7 +468,7 @@ sub process {
 	    $p .= $body;
 	    push @part, $p;
 
-	    $encoding = $part_header = $type = undef;
+	    $encoding = $part_header = $type = $attach_name = undef;
 	}
 
 	else {
@@ -698,10 +747,19 @@ if the message isn't to be multipart).
 
 =item B<--file> I<path>
 
+=item B<--file-auto> I<path>
+
+=item B<--file-attach> I<path>
+
 =item B<--string> I<str>
 
 Use the contents of the file I<path> or the literal string I<str> as the
 body of this part.
+
+B<--file-auto> causes the Content-Type to be set based on the file's
+name, if possible.
+
+B<--file-attach> does that and sets the B<--attachment> name as well.
 
 Be sure to include the trailing newline on I<str> unless there really
 isn't supposed to be one.  If you leave the trailing newline off the
@@ -740,6 +798,13 @@ Send a message which is read from stdin.
 
     fortune | mime-construct --to "$recip" --subject fortune --file -
 
+Send a plain text part and attach a file, setting the file's content
+type and B<--attachment> name automatically.
+
+    mime-construct --to "$recip" --subject "$file" \
+	--string "Here's the file I told you about.$nl" \
+	--file-attach "$file"
+
 Most people think of attachments as multipart messages, but they don't have
 to be.  This generates a zip of all the files in the current directory and
 sends them as an attachment but as a single part message.
@@ -748,14 +813,7 @@ sends them as an attachment but as a single part message.
 	mime-construct --to "$recip" --subject 'zipped directory' \
 	    --attachment dir.zip --type application/zip --file -
 
-This sends a zip file as an attachment in a multipart message, with some
-text in the first part.
-
-    mime-construct --to "$recip" --subject 'Mars or bust' \
-    	--string "$explanatory_text" \
-    	--type application/zip --attachment $zip --file $zip
-
-You can use the full experessiveness of Perl's open() when constructing
+You can use the full expressiveness of Perl's open() when constructing
 file names.  Eg, you can run processes
 
     mime-construct --to "$recip" --subject "$subject" \
@@ -799,6 +857,11 @@ messages/rfc822 parts.
 The body of the message is always held in memory, so you can expect
 problems if you work with bodies which are large compared to the amount
 of memory you've got.
+
+=head1 AVAILABILITY
+
+The code is licensed under the GNU GPL.  Check
+http://www.argon.org/~roderick/ for updated versions.
 
 =head1 AUTHOR
 

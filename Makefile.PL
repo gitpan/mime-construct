@@ -1,4 +1,4 @@
-# $Id: Makefile.PL,v 1.1 1999/04/03 05:01:28 roderick Exp $
+# $Id: Makefile.PL,v 1.2 2005/03/30 20:58:54 roderick Exp $
 
 use ExtUtils::MakeMaker;
 
@@ -8,6 +8,7 @@ WriteMakefile(
     PREREQ_PM		=> {
 			    'MIME::Base64'	=> 0,
 			    'MIME::QuotedPrint'	=> 0,
+			    'MIME::Types'	=> 0,
 			    'Proc::WaitStat'	=> 0,
     },
     VERSION_FROM	=> 'mime-construct',

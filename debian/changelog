@@ -1,3 +1,20 @@
+mime-construct (1.9) unstable; urgency=low
+
+  * Add --file-auto which sets the --type based on the file's extention.
+  * Add --file-attach which does --file-auto plus sets the --attach name.
+  * Have --attachment set a name=$name in the Content-Type.  This might
+    not be strictly safe (maybe a particular type uses name to mean
+    something else), but it's required by some mail clients.
+  * Bump Standards-Version to 3.6.1 (bump debhelper version dependency).
+
+ -- Roderick Schertler <roderick@argon.org>  Wed, 30 Mar 2005 15:58:32 -0500
+
+mime-construct (1.8-1) unstable; urgency=low
+
+  * Don't install extraneous empty directories.
+
+ -- Roderick Schertler <roderick@argon.org>  Tue, 31 Jul 2001 10:50:52 -0400
+
 mime-construct (1.8) unstable; urgency=low
 
   * Update to policy 3.5.2 (closes: #91005, #91587).
@@ -19,4 +36,4 @@ mime-construct (1.6) unstable; urgency=low
 
  -- Roderick Schertler <roderick@argon.org>  Sat,  3 Apr 1999 00:11:48 -0500
 
-$Id: changelog,v 1.4 2001/04/07 03:02:03 roderick Exp $
+$Id: changelog,v 1.6 2005/03/30 20:58:56 roderick Exp $
