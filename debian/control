@@ -1,0 +1,13 @@
+Source: mime-construct
+Section: mail
+Priority: optional
+Maintainer: Roderick Schertler <roderick@argon.org>
+Standards-Version: 2.5.0.0
+
+Package: mime-construct
+Architecture: all
+Depends: perl, libproc-waitstat-perl, libmime-base64-perl
+Description: construct/send MIME messages from the command line
+ mime-construct constructs and (by default) mails MIME messages.  It is
+ entirely driven from the command line, it is designed to be used by
+ other programs, or people who act like programs.
