@@ -1,66 +1,71 @@
 #!/usr/bin/make -f
 
-# $Id: rules,v 1.1 1999/04/03 05:01:33 roderick Exp $
+# $Id: rules,v 1.3 2001/04/07 03:02:14 roderick Exp $
 
-dt	:= debian/tmp
-prefix	= `pwd`/$(dt)
+dt		:= debian/mime-construct
+prefix		 = `pwd`/$(dt)
+stamp_build	:= debian/stamp.build
+stamp_install	:= debian/stamp.install
+clean		:= $(stamp_build) $(stamp_install)
 
-# Setting PREFIX at Makefile generation time loses because it might or
-# might not match *perl*.  If it does the resulting hierarchy is wrong.
-# So, set it at install time, after the structure of the hierarchy has
-# been determined.  Since I have to add variables at install time anyway
-# I set them all there.
+ifneq "" "$(findstring debug,$(DEB_BUILD_OPTIONS))"
+    CFLAGS		+= -g
+endif
+export DH_COMPAT	:= 3
+PERL			?= perl
 
-build:
+build: $(stamp_build)
+$(stamp_build):
 	dh_testdir
-	perl Makefile.PL
-	$(MAKE)
+	$(PERL) Makefile.PL INSTALLDIRS=vendor
+	$(MAKE) OPTIMIZE="-O2 -Wall $(CFLAGS)"
 	$(MAKE) test
+	touch $@
+
+install: $(stamp_install)
+$(stamp_install): $(stamp_build)
+	dh_testdir
+	dh_testroot
+	dh_clean -k
+	dh_installdirs
+	$(MAKE) install PREFIX=$(prefix)/usr
+	touch $@
 
 clean:
 	dh_testdir
 	dh_testroot
 	[ ! -f Makefile ] || $(MAKE) realclean
-	dh_clean
+	dh_clean $(clean)
 
-binary-indep: build
-#	dh_testversion
+binary: binary-indep binary-arch
+binary-arch:
+binary-indep: $(stamp_install)
 	dh_testdir
 	dh_testroot
-	dh_clean -k
-	dh_installdirs
-	$(MAKE) \
-		PREFIX=$(prefix)/usr \
-		INSTALLMAN1DIR=$(prefix)/usr/man/man1 \
-		INSTALLMAN3DIR=$(prefix)/usr/man/man3 \
-	    pure_perl_install
-
-	find $(prefix)/usr/lib -name .packlist -print0 | xargs -0r rm
-	find $(prefix)/usr/lib -depth -type d -print0 | \
-	    xargs -0r rmdir --ignore-fail-on-non-empty
-
+#	dh_installdebconf
 	dh_installdocs
 	dh_installexamples
 	dh_installmenu
+#	dh_installlogrotate
 #	dh_installemacsen
+#	dh_installpam
+#	dh_installmime
 #	dh_installinit
 	dh_installcron
-	dh_installmanpages
+	dh_installman
+	dh_installinfo
 #	dh_undocumented
 	dh_installchangelogs
+	dh_link
 	dh_strip
 	dh_compress
 	dh_fixperms
-	dh_suidregister
+#	dh_makeshlibs
 	dh_installdeb
+	dh_perl
 	dh_shlibdeps
 	dh_gencontrol -u -isp
-#	dh_makeshlibs
 	dh_md5sums
 	dh_builddeb
 
-binary-arch: build
-
-binary: binary-indep binary-arch
-
-.PHONY: build clean binary-indep binary-arch binary install
+.PHONY: build install clean binary-indep binary-arch binary

@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 use strict;
 
-# $Id: mime-construct,v 1.7 1999/04/03 05:12:13 roderick Exp $
+# $Id: mime-construct,v 1.9 2001/04/07 03:02:45 roderick Exp $
 #
 # Roderick Schertler <roderick@argon.org>
 
@@ -21,6 +21,7 @@ use strict;
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 # XXX
+#    - use mime.types to default the type for files, idea from PerlJam
 #    - don't always load bodies into memory?
 #    - continue long header lines I construct
 
@@ -28,7 +29,7 @@ use Proc::WaitStat qw(close_die);
 
 (my $Me = $0) =~ s-.*/--;
 my # new line required for makemaker
-    $VERSION = '1.6';
+    $VERSION = '1.8';
 
 my $Debug	= 0;
 my $Exit	= 0;
@@ -524,7 +525,7 @@ mime-construct - construct and optionally mail MIME messages
 
 =head1 SYNOPSIS
 
-B<mime-construct> switch...
+B<mime-construct> I<switch>...
 
 Sorry, it's hard to provide a meaningful synopsis.  See the examples.
 
@@ -762,7 +763,7 @@ file names.  Eg, you can run processes
     	--type application/x-gzip --file 'gzip -c file1 |' \
     	--type application/x-gzip --file 'gzip -c file2 |'
 
-or read from alternate filehandles (C<E<lt>&=4> to read from file
+or read from alternate file descriptors (C<E<lt>&=4> to read from file
 descriptor 4) or whatever.  See the open() section of L<perlfunc> for
 details.
 

@@ -1,7 +1,22 @@
+mime-construct (1.8) unstable; urgency=low
+
+  * Update to policy 3.5.2 (closes: #91005, #91587).
+  * Update to latest Perl policy.
+
+ -- Roderick Schertler <roderick@argon.org>  Fri,  6 Apr 2001 22:59:21 -0400
+
+mime-construct (1.7) unstable; urgency=low
+
+  * Tiny documentation tweaks.
+  * Simple updates for 3.0.0 standards.
+  * Simple updates for new Perl policy.
+
+ -- Roderick Schertler <roderick@argon.org>  Thu, 15 Jul 1999 11:37:31 -0400
+
 mime-construct (1.6) unstable; urgency=low
 
   * Initial version.
 
  -- Roderick Schertler <roderick@argon.org>  Sat,  3 Apr 1999 00:11:48 -0500
 
-$Id: changelog,v 1.2 1999/04/03 05:12:16 roderick Exp $
+$Id: changelog,v 1.4 2001/04/07 03:02:03 roderick Exp $
