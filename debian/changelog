@@ -1,3 +1,17 @@
+mime-construct (1.11) unstable; urgency=low
+
+  * Add --body and --attach aliases.
+
+ -- Roderick Schertler <roderick@argon.org>  Wed, 23 Jun 2010 14:04:40 -0400
+
+mime-construct (1.10) unstable; urgency=low
+
+  * Escape /^From / as "=46rom " in quoted-printable to prevent an MTA
+    from mangling it (closes: #499398).
+  * Bump Standards-Version to 3.8.0 (no changes).
+
+ -- Roderick Schertler <roderick@argon.org>  Thu, 19 Nov 2009 19:59:31 -0500
+
 mime-construct (1.9) unstable; urgency=low
 
   * Add --file-auto which sets the --type based on the file's extention.
@@ -36,4 +50,4 @@ mime-construct (1.6) unstable; urgency=low
 
  -- Roderick Schertler <roderick@argon.org>  Sat,  3 Apr 1999 00:11:48 -0500
 
-$Id: changelog,v 1.6 2005/03/30 20:58:56 roderick Exp $
+$Id: changelog,v 1.8 2010-06-23 18:07:38 roderick Exp $

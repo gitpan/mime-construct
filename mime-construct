@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 use strict;
 
-# $Id: mime-construct,v 1.10 2005/03/30 20:58:54 roderick Exp $
+# $Id: mime-construct,v 1.13 2010-06-23 18:07:36 roderick Exp $
 #
 # Roderick Schertler <roderick@argon.org>
 
@@ -21,6 +21,7 @@ use strict;
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 # XXX
+#    - set envelope sender
 #    - don't always load bodies into memory?
 #    - continue long header lines I construct
 
@@ -28,7 +29,7 @@ use Proc::WaitStat qw(close_die);
 
 (my $Me = $0) =~ s-.*/--;
 my # new line required for makemaker
-    $VERSION = '1.9';
+    $VERSION = '1.11';
 
 my $Debug	= 0;
 my $Exit	= 0;
@@ -65,7 +66,9 @@ usage: $Me switch...
     --file-auto path	same, but also set the Content-Type from the
 			path's extention (requires MIME::Types)
     --file-attach path	same, but also set --attachment to the file's base name
+    --attach path	synonym for --file-attach
     --string str	output a part whose contents are str
+    --body str		synonym for --string
 
   Subpart output switches:
     --subpart-file path
@@ -125,6 +128,11 @@ my @Word = qw(
     unrepresentable unthinkable ventricles whitehall
 );
 
+my %Switch_synonym = (
+    '--attach'	=> '--file-attach',
+    '--body'	=> '--string',
+);
+
 sub xwarndie_mess {
     my @mess = ("$Me: ", @_);
     $mess[$#mess] =~ s/:(?!\n)$/: $!\n/;
@@ -182,6 +190,7 @@ sub choose_encoding {
     return '7bit' if $s !~ /[^\011\012\040-\176]/	# valid chars
 			&& $s =~ /\n\Z/			# trailing \n
 			&& $s !~ /[ \t]\n/		# no trailing spaces
+			&& $s !~ /^From /m		# no "From " lines
     	    	    	&& $s !~ /^.{81,}$/m;		# no long lines
 
     # If requested, just classify other data as either 8bit or binary,
@@ -218,6 +227,8 @@ sub encode {
     elsif ($lc_encoding eq 'quoted-printable') {
 	require MIME::QuotedPrint;
 	$s = MIME::QuotedPrint::encode($s);
+    	# Escape /^From / to prevent an MTA from mangling it.
+	$s =~ s/^From /=46rom /mg;
     }
     elsif ($lc_encoding eq 'base64') {
 	require MIME::Base64;
@@ -317,6 +328,10 @@ sub process {
 
     while (@args) {
     	$switch = shift @args;
+
+	if (defined(my $s = $Switch_synonym{$switch})) {
+	    $switch = $s;
+	}
 
 	$switch =~ /^-/ or usage "invalid arg (non-switch) $switch\n";
 
@@ -709,6 +724,9 @@ any data from the file called I<name>!  It just uses that name in the
 header.  The actual data which will go into this part of the message
 comes from one of the regular part output switches (given below).
 
+You might prefer to use the B<--file-attach> switch, which does read
+from the I<name>d file.
+
 =item B<--encoding> I<type>
 
 This specifies the type of encoding you want this part to use.  You
@@ -735,6 +753,9 @@ it defaults to C<text/plain>.  The I<type> you supply can contain not
 only the type proper but also options.  The whole thing will just be
 plopped onto the end of C<Content-Type:> and stuck into the header.
 
+You might prefer to use the B<--file-auto> or B<--file-attach> switches,
+which set the B<--type> automatically based on a file's name.
+
 =back
 
 =head2 Part Output
@@ -751,7 +772,11 @@ if the message isn't to be multipart).
 
 =item B<--file-attach> I<path>
 
+=item B<--attach> I<path>
+
 =item B<--string> I<str>
+
+=item B<--body> I<str>
 
 Use the contents of the file I<path> or the literal string I<str> as the
 body of this part.
@@ -767,6 +792,9 @@ part will have to be encoded in C<base64> (because C<quoted-printable>
 has an artificial limitation which prevents it from being able to encode
 such a data stream).
 
+B<--attach> is an alias for B<--file-attach>, and B<--body> is an alias
+for B<--string>.
+
 =item B<--subpart-file> I<path>
 
 =item B<--subpart-string> I<str>
@@ -781,13 +809,14 @@ invocation of B<mime-construct> which was given the B<--subpart> switch.
 
 =back
 
-Arguments to both B<--file> and B<--subpart-file> can have some magic.
-If there is no file with the I<path> supplied a regular Perl open() is
-done on it.  See L<"EXAMPLES">.
+Arguments to switches which take a file name (such as B<--file> and
+B<--subpart-file>) can have some magic.  If there is no file with
+the I<path> supplied a regular Perl open() is done on it.  See
+L<"EXAMPLES">.
 
 =head1 EXAMPLES
 
-The examples assume than $nl contains a newline.  The other variables
+The examples assume that $nl contains a newline.  The other variables
 used are I hope self-explanatory.
 
 Send a simple message.
@@ -815,21 +844,21 @@ sends them as an attachment but as a single part message.
 
 You can use the full expressiveness of Perl's open() when constructing
 file names.  Eg, you can run processes
+XXX bad examples, there's no file names
 
     mime-construct --to "$recip" --subject "$subject" \
-    	--string "Here are those two files you wanted.$nl" \
-    	--type application/x-gzip --file 'gzip -c file1 |' \
-    	--type application/x-gzip --file 'gzip -c file2 |'
+     --string "Here are those two files you wanted.$nl" \
+     --type application/x-gzip --attachment file1.gz --file 'gzip -c file1 |' \
+     --type application/x-gzip --attachment file1.gz --file 'gzip -c file2 |'
 
 or read from alternate file descriptors (C<E<lt>&=4> to read from file
-descriptor 4) or whatever.  See the open() section of L<perlfunc> for
-details.
+descriptor 4) or whatever.  See L<perlopentut> for a tutorial.
 
 Here's an example of using a separate invocation of B<mime-construct>
 to create a subpart.  This creates a message which has two parts at the
 top level.  The first part is some text, the second part is a digest.
 The digest itself is a multipart message which contains a number of
-messages/rfc822 parts.
+message/rfc822 parts.
 
     msg_args=
     for msg in $msg_list
@@ -849,8 +878,29 @@ messages/rfc822 parts.
 	    --header "To: Digest recipients:;$nl" \
 	    --subject 'Foo digest' \
 	    "$@" \
-	    --file $introduction \
+	    --file "$introduction" \
 	    --subpart-file -
+
+Here is how to send an encrypted messages (multipart/encrypted, as
+defined in RFC 1847).  You use B<mime-construct> C<--subpart> to
+generate the real message you want to send (which can be kind of
+MIME message -- non-text, multi-part, what have you), then encrypt
+that and use another B<mime-construct> to contruct and send the
+multipart/encrypted message which contains it.
+
+    enc_type=application/pgp-encrypted
+    enc_params="Version: 1$nl"
+
+    mime-construct --subpart --file body --file-auto image.jpg |
+      gpg --encrypt --armor -r "$recip" |
+      mime-construct --output \
+	--to "$recip" \
+	--subject "$subject" \
+	--multipart "multipart/encrypted; protocol=\"$enc_type\"" \
+	--type "$enc_type" \
+	--string "$enc_params" \
+	--type application/octet-stream \
+	--file -
 
 =head1 BUGS
 
